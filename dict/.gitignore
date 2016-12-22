@@ -5,3 +5,4 @@
 !generate_dict.py
 !dict.txt.gz
 !stop_words.txt
+!download_and_rebuild_dict.sh
