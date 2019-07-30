@@ -1,6 +1,3 @@
-import numpy as np
-
-
 # noinspection PyShadowingBuiltins
 def list_possible_decompositions(words_with_masks, rows_count, print_fun=print):
     print = print_fun
@@ -118,7 +115,7 @@ def find_possible_words_hashed(board, rows_count):
     '''
 
     def words_by_prefix(pref_indices):
-        return words_hashed.get(''.join([board[r + 1, c + 1] for r, c in pref_indices]), [])
+        return words_hashed.get(''.join([board[r + 1][c + 1] for r, c in pref_indices]), [])
 
     def find_possible_words_in_position(row, col, possible_words):
         for possible_word in possible_words:
@@ -156,10 +153,10 @@ def find_possible_words_hashed(board, rows_count):
 def is_word_in_position(board, i, j, word, rows_count):
     if len(word) == 0:
         return []  # should never happens
-    if word[0] != board[i, j]:
+    if word[0] != board[i][j]:
         return []
-    p = board[i, j]
-    board[i, j] = '.'
+    p = board[i][j]
+    board[i][j] = '.'
     idx = (i - 1) * rows_count + (j - 1)
     res = int('0' * idx + '1' + '0' * (rows_count * rows_count - idx - 1), 2)
 
@@ -174,7 +171,7 @@ def is_word_in_position(board, i, j, word, rows_count):
             is_word_in_position(board, i, j + 1, word[1:], rows_count)
         # update binary mask
         result = [res | r for r in result]
-    board[i, j] = p
+    board[i][j] = p
     return result
 
 
@@ -182,15 +179,21 @@ def solve_txt(rows):
     output = []
     rows_count = len(rows)
     # noinspection PyTypeChecker
-    board = np.full((rows_count + 3, rows_count + 3), ' ', dtype=np.dtype(('U', 1)))
-    for i in range(rows_count):
-        for j in range(rows_count):
-            board[i + 1, j + 1] = rows[i][j]
+    board = fill_the_board(rows, rows_count)
 
     possible_words_sorted_by_len = find_possible_words_hashed(board, rows_count)
     list_possible_decompositions(possible_words_sorted_by_len, rows_count,
                                  lambda *p: output.append(' '.join(str(pp) for pp in p)))
     return '\n'.join(output)
+
+
+def fill_the_board(rows, rows_count):
+    board = [[' '] * (rows_count + 3) for i in range(rows_count + 3)]
+
+    for i in range(rows_count):
+        for j in range(rows_count):
+            board[i + 1][j + 1] = rows[i][j]
+    return board
 
 
 # def is_word_anywhere(board, word, rows_count):
@@ -201,4 +204,11 @@ def solve_txt(rows):
 #     return list(set(result))
 
 
-min_empty_cells = 1e9
+if __name__ == "__main__":
+    import timeit
+
+    print(solve_txt(['бтксовтс', 'ойеашузе', 'рдогадаж', 'дбйкинму', 'ерездьтт', 'иббнелое', 'шатопуеп', 'усьледль']))
+    print(timeit.timeit(
+        stmt="solve_txt(['бтксовтс', 'ойеашузе', 'рдогадаж', 'дбйкинму', 'ерездьтт', 'иббнелое', 'шатопуеп', 'усьледль'])",
+        setup="from __main__ import solve_txt", number=10))
+    # print(solve_txt(['мохог', 'ткарл', 'ечазе', 'нжукм', 'ищета']))
