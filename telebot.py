@@ -15,7 +15,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 def reply_to_start_command(bot, update):
     logging.debug(f'reply to start call for bot: {bot}')
     first_name = update.effective_user.first_name
-    update.message.reply_text("Я робот Фиводор, я умею разгадывать слова в игре ФИЛВОРДЫ."
+    update.message.reply_text("Привет! Я робот Федор Филвордович. Филвордович - фамилия. "
+                              "Я умею разгадывать слова в игре ФИЛВОРДЫ."
                               " Пришли мне картинку из этой игры, {}".format(first_name))
 
 
@@ -28,6 +29,9 @@ def reply_to_debug_command(bot, update):
         with open(pkl_filename, 'rb') as f:
             dbg = pickle.load(f)
         reply_photo_by_array(update, visualise_contours(dbg))
+        if ('*' in ''.join(dbg.get('board',''))) and ('letters_pic' in dbg):
+            reply_photo_by_array(update, dbg['letters_pic']*255)
+
         logging.info("debug keys: " + ', '.join(dbg.keys()))
     else:
         update.message.reply_text("Не могу сделать debug, нет истории. Пришли хотя бы одну картинку.")
@@ -64,6 +68,7 @@ def solve_frame(frame, dbg):
     solved = False
     if (rows == cols) and (rows > 2):
         letters_to_recognize = extract_letters_to_recognize(frame_bw, rows)
+        dbg['letters_pic'] = letters_to_recognize_to_pic(letters_to_recognize)
         board = build_board(letters_to_recognize)
         dbg['board'] = board
         board_printable = ('\n'.join([''.join(c + ' ' for c in l) for l in board]))
