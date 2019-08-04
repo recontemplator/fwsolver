@@ -1,36 +1,50 @@
 import logging
-import os
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from computer_vision import *
 from ocr import *
 from solver2 import *
+import pickle
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def reply_to_start_command(bot, update):
     logging.debug(f'reply to start call for bot: {bot}')
     first_name = update.effective_user.first_name
-    update.message.reply_text("Send me a fillword picture {}".format(first_name))
+    update.message.reply_text("Я робот Фиводор, я умею разгадывать слова в игре ФИЛВОРДЫ."
+                              " Пришли мне картинку из этой игры, {}".format(first_name))
 
 
 def check_pic(bot, update):
-    update.message.reply_text("Обрабатываю фото")
+    update.message.reply_text("Спасибо за картинку!")
     photo_file = bot.getFile(update.message.photo[-1].file_id)
     filename = os.path.join('downloads', '{}.jpg'.format(photo_file.file_id))
+    filename_pkl = os.path.join('downloads', '{}.pkl'.format(photo_file.file_id))
     photo_file.download(filename)
     frame = cv2.imread(filename)
-    update.message.reply_text(solve_frame(frame))
+    dbg = {}
+    update.message.reply_text(solve_frame(frame, dbg))
+    with open(filename_pkl, 'wb') as f:
+        pickle.dump(dbg, f)
 
 
-def solve_frame(frame):
-    frame_bw, rows, cols = get_frame_bw_adaptive2(frame)
+def solve_frame(frame, dbg):
+    frame_bw, rows, cols = get_frame_bw_adaptive2(frame, dbg)
+    solved = False
     if (rows == cols) and (rows > 2):
         letters_to_recognize = extract_letters_to_recognize(frame_bw, rows)
         board = build_board(letters_to_recognize)
-        return solve_txt(board)
+        dbg['board'] = board
+        board_printable = ('\n'.join([''.join(c + ' ' for c in l) for l in board]))
+        answer = f'Вот какое поле для игры, я увидел своим компютерным зрением:\n' \
+                 f'{board_printable}\n\n{solve_txt(board)}'
+        solved = True
     else:
-        return f'Unable to detect the board. Best attempt is {rows}x{cols} field.'
+        answer = f'Видимо, ' \
+                 f'моё компьютерное зрение подводит меня, я не вижу тут игрового поля.'
+    dbg['answer'] = answer
+    dbg['solved'] = solved
+    return answer
 
 
 def start_bot():

@@ -2,14 +2,18 @@ import cv2
 import numpy as np
 import gzip
 import pickle
+import os
+
+OCR_DATA_ENV_KEY = 'OCR_DATA'
 
 kernel5 = np.ones((5, 5), np.uint8)
 
-OCR_DATA = 'letters.dat'
+OCR_DATA_DEFAULT_PATH = 'letters.dat'
 patterns = None
 
 
-def init_ocr(ocr_data=OCR_DATA):
+def init_ocr():
+    ocr_data = os.environ[OCR_DATA_ENV_KEY] if OCR_DATA_ENV_KEY in os.environ else OCR_DATA_DEFAULT_PATH
     global patterns
     with gzip.open(ocr_data, 'r') as f:
         patterns = pickle.load(f, encoding='latin1')

@@ -1,4 +1,5 @@
 from skimage.filters import threshold_local
+from skimage.morphology import remove_small_objects
 import cv2
 import numpy as np
 
@@ -92,7 +93,11 @@ def find_stripes_count(sums):
                 sum_vert[max(v - ws, 0):v] *= (sum_vert[max(v - ws, 0):v]) > sum_vert[v]
         sum_ver_idxs = sum_ver_idxs[sum_vert[sum_ver_idxs] > 0.8 * sum_vert.max()]
 
-        return int(sum_vert.shape[0] / np.median(np.diff(sum_ver_idxs)))
+        diffs = np.diff(sum_ver_idxs)
+        if len(diffs) > 0:
+            return int(sum_vert.shape[0] / np.median(diffs))
+        else:
+            return -1
     except:
         return -1
 
@@ -113,31 +118,49 @@ def get_frame_bw_adaptive2(frame, dbg=None):
     kernel5 = np.ones((5, 5), np.uint8)
     # side = 768
     frame_src_bw = to_bw(frame)
+    dbg['frame_src_bw'] = frame_src_bw
     ext_contours, hierarchy = cv2.findContours(frame_src_bw, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     frame_area = np.prod(frame_src_bw.shape[:2])
     frame_bw_result, rows_result, cols_result = None, -1, -1
+    all_considered_contours = []
     for contour in ext_contours:
         if cv2.contourArea(contour) > frame_area * .1:
+            all_considered_contours.append(contour)
             corners = get_corners_by_contour(contour)
-            dbg['corners'] = corners
-            frame_bw = cv2.morphologyEx(to_bw(get_aoi_by_corners(frame, corners, 768)), cv2.MORPH_OPEN, kernel5)
+            aoi_by_corners = get_aoi_by_corners(frame, corners, 768)
+            frame_bw = cv2.morphologyEx(to_bw(aoi_by_corners), cv2.MORPH_OPEN, kernel5)
             rows, cols = find_stripes_count(frame_bw.sum(axis=1)), find_stripes_count(frame_bw.sum(axis=0))
             if (rows == cols) and (rows > 2):
+                dbg['corners'] = corners
+                dbg['aoi_by_corners'] = aoi_by_corners
+                dbg['contour'] = contour
                 rows_result, cols_result = rows, cols
                 # frame_bw_result = cv2.morphologyEx(to_bw2(get_aoi_by_corners(frame, corners, 1024)), cv2.MORPH_OPEN,
                 #                                    kernel5)
                 if rows > 5:
-                    frame_bw_result = to_bw2(get_aoi_by_corners(frame, corners, 2048))
+                    aoi_by_corners = get_aoi_by_corners(frame, corners, 2048)
+                    dbg['aoi_by_corners'] = aoi_by_corners
+                    frame_bw_result = to_bw2(aoi_by_corners)
                 #                     frame_bw_result = cv2.morphologyEx(frame_bw_result, cv2.MORPH_OPEN, kernel5)
                 else:
                     frame_bw_result = frame_bw
+            else:
+                dbg['corners_candidate'] = corners
+                dbg['aoi_by_corners_candidate'] = aoi_by_corners
+
+    dbg['all_considered_contours'] = all_considered_contours
     return frame_bw_result, rows_result, cols_result
+
+
+def remove_zero_paddings(roi):
+    b = np.argwhere(roi)
+    (y_start, x_start), (y_stop, x_stop) = b.min(0), b.max(0) + 1
+    return roi[y_start:y_stop, x_start:x_stop]
 
 
 def extract_letters_to_recognize(img, size):
     assert img.shape[0] == img.shape[1]
     side = img.shape[0]
-    ii = 1
     padding = 30
     letters_to_recognize = []
     for i in range(size):
@@ -146,11 +169,9 @@ def extract_letters_to_recognize(img, size):
                   int(i * side / size + padding):int((i + 1) * side / size - padding),
                   int(j * side / size + padding):int((j + 1) * side / size - padding)
                   ]
-
-            b = np.argwhere(roi)
-            (y_start, x_start), (y_stop, x_stop) = b.min(0), b.max(0) + 1
-            ii += 1
-            letters_to_recognize.append(roi[y_start:y_stop, x_start:x_stop])
+            roi2 = remove_zero_paddings(roi).astype(bool)
+            roi2 = remove_small_objects(roi2, min_size=np.prod(roi2.shape) // 25).astype('uint8')
+            letters_to_recognize.append(remove_zero_paddings(roi2))
     return letters_to_recognize
 
 

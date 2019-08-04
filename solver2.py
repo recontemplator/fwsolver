@@ -1,3 +1,10 @@
+import os
+from typing import List
+
+DICT_FILE_ENV_KEY = 'DICT_FILE'
+DICT_FILE_DEFAULT_PATH = 'dict/dict_filtered.txt'
+
+
 # noinspection PyShadowingBuiltins
 def list_possible_decompositions(words_with_masks, rows_count, print_fun=print):
     print = print_fun
@@ -20,8 +27,8 @@ def list_possible_decompositions(words_with_masks, rows_count, print_fun=print):
             return
         if effective_mask == full_mask:
             solution_found = [pw[0] for pw in sorted(already_used_words_masks, key=len, reverse=True)]
-            if len(solutions) == 0 or len(solution_found) < min(map(len, solutions)):
-                print('Found solution in %d words' % len(solution_found))
+            # if len(solutions) == 0 or len(solution_found) < min(map(len, solutions)):
+            #     print('Found solution in %d words' % len(solution_found))
             if not (solution_found in solutions):
                 solutions.append(solution_found)
                 #                cnt[2]=min(r,cnt[2])
@@ -55,13 +62,16 @@ def list_possible_decompositions(words_with_masks, rows_count, print_fun=print):
     # print 'rec fun called times,max_depth:',cnt
     other_cnt = 0
     if len(solutions) > 0:
-        print('%d different solutions found' % len(solutions))
-        solutions_sorted_by_wc = sorted(solutions, key=len)
-        if cnt[1]:
-            print('* not all possible solutions were enumerated')
-        # noinspection PyTypeChecker
-        print('[One of the] shortest solution(%d words):\n%s' %
-              (len(solutions_sorted_by_wc[0]), ' '.join(solutions_sorted_by_wc[0])))
+        solutions_sorted_by_wc: List[str] = sorted(solutions, key=len)
+        if len(solutions) == 1:
+            print('Найдено, по моему, единственное решение:')
+            print('  ', ', '.join(solutions_sorted_by_wc[0]))
+        else:
+            print(f'Найдено разных решений: {len(solutions)} ')
+            if cnt[1]:
+                print('но, скорее всего, их ещё больше.')
+            # noinspection PyTypeChecker
+            print('Один из вариантов:\n  %s' % ', '.join(solutions_sorted_by_wc[0]))
         # noinspection PyTypeChecker
         words_already_shown = set(solutions_sorted_by_wc[0])
         for solution in solutions_sorted_by_wc[1:]:
@@ -70,13 +80,14 @@ def list_possible_decompositions(words_with_masks, rows_count, print_fun=print):
             if len(unseen_words) == 0:
                 other_cnt += 1
             else:
-                print('alternative (%d words), including: %s' % (len(solution), ' '.join(unseen_words)))
+                print('Ещё вариант, включает: %s' % (', '.join(unseen_words)))
                 words_already_shown.update(unseen_words)
         if other_cnt > 0:
-            print('And %d other solutions, with words already mentioned' % other_cnt)
+            print('Есть ещё %d разных вариантов, из ранее названных слов' % other_cnt)
         # print('rec calls: %d' % cnt[0])
     else:
-        print('Solutions have not been found.')
+        print('Не могу найти полных решений, но вот несколькл слов, которые могли быть тут загаданы:')
+        print('  ', ', '.join(map(lambda t: t[0], words_with_masks[:10])))
 
 
 dominoes = [
@@ -85,10 +96,11 @@ dominoes = [
     [(0, 0), (1, 0)],
     [(0, 0), (-1, 0)]
 ]
-DICT_FILE = 'dict/dict_filtered.txt'
 
 
-def init_dict(dict_file=DICT_FILE):
+def init_dict():
+    dict_file = os.environ[DICT_FILE_ENV_KEY] if DICT_FILE_ENV_KEY in os.environ else DICT_FILE_DEFAULT_PATH
+
     global words_hashed
     words_dict = {}
     with open(dict_file) as ff:
@@ -188,7 +200,7 @@ def solve_txt(rows):
 
 
 def fill_the_board(rows, rows_count):
-    board = [[' '] * (rows_count + 3) for i in range(rows_count + 3)]
+    board = [[' '] * (rows_count + 3) for _ in range(rows_count + 3)]
 
     for i in range(rows_count):
         for j in range(rows_count):
@@ -205,10 +217,11 @@ def fill_the_board(rows, rows_count):
 
 
 if __name__ == "__main__":
-    import timeit
-
     print(solve_txt(['бтксовтс', 'ойеашузе', 'рдогадаж', 'дбйкинму', 'ерездьтт', 'иббнелое', 'шатопуеп', 'усьледль']))
-    print(timeit.timeit(
-        stmt="solve_txt(['бтксовтс', 'ойеашузе', 'рдогадаж', 'дбйкинму', 'ерездьтт', 'иббнелое', 'шатопуеп', 'усьледль'])",
-        setup="from __main__ import solve_txt", number=10))
+    # import timeit
+    # print(solve_txt(['бтксовтс', 'ойеашузе', 'рдогадаж', 'дбйкинму', 'ерездьтт', 'иббнелое', 'шатопуеп', 'усьледль']))
+    # print(timeit.timeit(
+    #     stmt="solve_txt(['бтксовтс', 'ойеашузе', 'рдогадаж', "
+    #          "'дбйкинму', 'ерездьтт', 'иббнелое', 'шатопуеп', 'усьледль'])",
+    #     setup="from __main__ import solve_txt", number=10))
     # print(solve_txt(['мохог', 'ткарл', 'ечазе', 'нжукм', 'ищета']))
