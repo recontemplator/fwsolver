@@ -170,7 +170,7 @@ def extract_letters_to_recognize(img, size):
                   int(j * side / size + padding):int((j + 1) * side / size - padding)
                   ]
             roi2 = remove_zero_paddings(roi).astype(bool)
-            roi2 = remove_small_objects(roi2, min_size=np.prod(roi2.shape) // 25).astype('uint8')
+            roi2 = remove_small_objects(roi2, min_size=np.prod(roi2.shape) // 30).astype('uint8')
             letters_to_recognize.append(remove_zero_paddings(roi2))
     return letters_to_recognize
 

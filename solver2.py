@@ -87,7 +87,8 @@ def list_possible_decompositions(words_with_masks, rows_count, print_fun=print):
         # print('rec calls: %d' % cnt[0])
     else:
         print('Не могу найти полных решений, но вот несколькл слов, которые могли быть тут загаданы:')
-        print('  ', ', '.join(map(lambda t: t[0], words_with_masks[:10])))
+        # noinspection PyTypeChecker
+        print('  ', ', '.join(sorted(set(next(zip(*words_with_masks))), key=len, reverse=True)[:15]))
 
 
 dominoes = [
