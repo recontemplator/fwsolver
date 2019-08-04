@@ -191,3 +191,26 @@ def letters_to_recognize_to_pic(letters_to_recognize):
             cells_pic[row_from:row_from + cw, col_from:col_from + ch] = cell
             ii += 1
     return cells_pic
+
+
+palette10 = [(31, 119, 180),
+             (255, 127, 14),
+             (44, 160, 44),
+             (214, 39, 40),
+             (148, 103, 189),
+             (140, 86, 75),
+             (227, 119, 194),
+             (127, 127, 127),
+             (188, 189, 34),
+             (23, 190, 207)]
+
+
+def visualise_contours(dbg):
+    img = np.dstack([dbg['frame_src_bw'].astype(np.uint8)] * 3) * 255
+    if dbg.get('contour', None) is not None:
+        img_copy = cv2.drawContours(img.copy(), [dbg['contour']], -1, palette10[0], -3)
+        img = cv2.addWeighted(img, 0.3, img_copy, 0.7, 0)
+    palette_repeated = palette10[1:] * (len(dbg['all_considered_contours']) // 9 + 1)
+    for idx, contour in enumerate(dbg['all_considered_contours']):
+        cv2.drawContours(img, [contour], -1, palette_repeated[idx], 5)
+    return img
