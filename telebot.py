@@ -34,7 +34,21 @@ def reply_to_debug_command(bot, update):
         if ('*' in ''.join(dbg.get('board', ''))) and ('letters_pic' in dbg):
             reply_photo_by_array(update, dbg['letters_pic'] * 255)
 
-        logging.info("debug keys: " + ', '.join(dbg.keys()))
+        logging.debug("debug keys: " + ', '.join(dbg.keys()))
+    else:
+        update.message.reply_text("Не могу сделать debug, нет истории. Пришли хотя бы одну картинку.")
+
+
+def reply_to_ar_command(bot, update):
+    logging.debug(f'reply to ar call for bot: {bot}')
+    filename_user_log = os.path.join('downloads', 'usr_{}.log'.format(update.effective_user.id))
+    if os.path.isfile(filename_user_log):
+        with open(filename_user_log) as f:
+            pkl_filename = f.readline().strip()
+        with open(pkl_filename, 'rb') as f:
+            dbg = pickle.load(f)
+        if 'answer_ar' in dbg:
+            reply_photo_by_array(update, dbg['answer_ar'])
     else:
         update.message.reply_text("Не могу сделать debug, нет истории. Пришли хотя бы одну картинку.")
 
@@ -108,6 +122,7 @@ def start_bot():
 
     dp = my_bot.dispatcher
     dp.add_handler(CommandHandler("start", reply_to_start_command))
+    dp.add_handler(CommandHandler("ar", reply_to_ar_command))
     dp.add_handler(CommandHandler("debug", reply_to_debug_command))
     dp.add_handler(MessageHandler(Filters.photo, check_pic))
     my_bot.start_polling()
