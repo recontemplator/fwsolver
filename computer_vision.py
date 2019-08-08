@@ -127,19 +127,23 @@ def get_frame_bw_adaptive2(frame, dbg=None):
         if cv2.contourArea(contour) > frame_area * .1:
             all_considered_contours.append(contour)
             corners = get_corners_by_contour(contour)
-            aoi_by_corners = get_aoi_by_corners(frame, corners, 768)
+            aoi_side = 768
+            aoi_by_corners = get_aoi_by_corners(frame, corners, aoi_side)
             frame_bw = cv2.morphologyEx(to_bw(aoi_by_corners), cv2.MORPH_OPEN, kernel5)
             rows, cols = find_stripes_count(frame_bw.sum(axis=1)), find_stripes_count(frame_bw.sum(axis=0))
             if (rows == cols) and (rows > 2):
                 dbg['corners'] = corners
                 dbg['aoi_by_corners'] = aoi_by_corners
                 dbg['contour'] = contour
+                dbg['aoi_side'] = aoi_side
                 rows_result, cols_result = rows, cols
                 # frame_bw_result = cv2.morphologyEx(to_bw2(get_aoi_by_corners(frame, corners, 1024)), cv2.MORPH_OPEN,
                 #                                    kernel5)
                 if rows > 5:
-                    aoi_by_corners = get_aoi_by_corners(frame, corners, 2048)
+                    aoi_side = 2048
+                    aoi_by_corners = get_aoi_by_corners(frame, corners, aoi_side)
                     dbg['aoi_by_corners'] = aoi_by_corners
+                    dbg['aoi_side'] = aoi_side
                     frame_bw_result = to_bw2(aoi_by_corners)
                 #                     frame_bw_result = cv2.morphologyEx(frame_bw_result, cv2.MORPH_OPEN, kernel5)
                 else:
@@ -214,3 +218,81 @@ def visualise_contours(dbg):
     for idx, contour in enumerate(dbg['all_considered_contours']):
         cv2.drawContours(img, [contour], -1, palette_repeated[idx], 5)
     return img
+
+
+def decomposition_to_labels(decomposition, rows):
+    labels = np.zeros(rows * rows, 'uint8')
+    for idx, (w, _, d) in enumerate(decomposition):
+        labels[d] = idx
+    return labels.reshape((rows, rows))
+
+
+def make_connections_map(labels):
+    nl = [set() for _ in range(labels.max() + 1)]
+    for r in range(labels.shape[0] - 1):
+        for c in range(labels.shape[1] - 1):
+            v = labels[r, c]
+            for nv in [labels[i] for i in [(r, c + 1), (r + 1, c), (r + 1, c + 1)]]:
+                nl[v].add(nv)
+                nl[nv].add(v)
+    for idx, v in enumerate(nl):
+        v.add(idx)
+    return nl
+
+
+def make_color_map(nl):
+    all_colors = set(range(len(palette10)))
+    iterations_made = 0
+    make_iteration = True
+    colormap = list(range(len(nl)))
+    while make_iteration:
+        colormap = np.full(len(nl), -1)
+        colormap[0] = np.random.choice(list(all_colors))
+        make_iteration = False
+        iterations_made += 1
+        for i in range(1, len(colormap)):
+            possible_colors = list(all_colors - set(colormap[list(nl[i])]))
+            if not possible_colors:
+                if iterations_made < 100:
+                    make_iteration = True
+                    break
+                else:
+                    possible_colors = list(all_colors)
+            colormap[i] = np.random.choice(possible_colors)
+    return colormap
+
+
+def make_color_grid(decomposition, rows, aoi_side):
+    labels = decomposition_to_labels(decomposition, rows)
+    colormap = make_color_map(make_connections_map(labels))
+    img_rgb_canvas = np.zeros((aoi_side, aoi_side, 3), 'uint8')
+    side = img_rgb_canvas.shape[0] / rows
+    for r in range(rows):
+        for c in range(rows):
+            img_rgb_canvas[int(r * side):int((r + 1) * side), int(c * side):int((c + 1) * side), :] = palette10[
+                colormap[labels[rows - r - 1, rows - c - 1]]]
+
+    img_rgb = img_rgb_canvas.copy()
+    for _, (r, c), _ in decomposition:
+        x, y = (int(c * side), int(r * side))
+        pts = np.array([[x, y], [x + side // 5, y], [x, y + side // 5]], np.int32).reshape((-1, 1, 2))
+        cv2.fillPoly(img_rgb_canvas, [pts], color=(0, 0, 0))
+
+    return cv2.addWeighted(img_rgb, 0.6, img_rgb_canvas, 0.4, 0)
+
+
+def make_ar_frame(frame, decomposition, rows, corners):
+    aoi_side = 768
+    img_rgb = make_color_grid(decomposition, rows, aoi_side)
+
+    dst = np.array(corners, dtype='float32')
+    src = np.array([[0, 0], [aoi_side - 1, 0], [aoi_side - 1, aoi_side - 1], [0, aoi_side - 1]], dtype='float32')
+    img_overlay = cv2.warpPerspective(img_rgb, cv2.getPerspectiveTransform(src, dst), frame.shape[1::-1])
+    frame_masked = cv2.bitwise_and(frame, frame, mask=(img_overlay.sum(axis=2) == 0).astype('uint8') * 255)
+    frame_with_overlay = cv2.bitwise_or(frame_masked, img_overlay)
+    return cv2.addWeighted(frame, 0.6, frame_with_overlay, 0.4, 0.0)
+
+
+def make_answer_frame(frame_bw, decomposition, rows):
+    img_rgb = 255 - np.dstack([frame_bw.astype(np.uint8)] * 3) * 255
+    return cv2.addWeighted(img_rgb, 0.3, make_color_grid(decomposition, rows, frame_bw.shape[0]), 0.7, 0)

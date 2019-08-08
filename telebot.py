@@ -29,8 +29,10 @@ def reply_to_debug_command(bot, update):
         with open(pkl_filename, 'rb') as f:
             dbg = pickle.load(f)
         reply_photo_by_array(update, visualise_contours(dbg))
-        if ('*' in ''.join(dbg.get('board',''))) and ('letters_pic' in dbg):
-            reply_photo_by_array(update, dbg['letters_pic']*255)
+        if 'answer_ar' in dbg:
+            reply_photo_by_array(update, dbg['answer_ar'])
+        if ('*' in ''.join(dbg.get('board', ''))) and ('letters_pic' in dbg):
+            reply_photo_by_array(update, dbg['letters_pic'] * 255)
 
         logging.info("debug keys: " + ', '.join(dbg.keys()))
     else:
@@ -38,11 +40,21 @@ def reply_to_debug_command(bot, update):
 
 
 def reply_photo_by_array(update, img):
-    bio = BytesIO()
-    bio.name = 'image.jpeg'
-    Image.fromarray(img).save(bio, 'JPEG')
-    bio.seek(0)
-    update.message.reply_photo(photo=bio)
+    if isinstance(img, np.ndarray):
+        bytes_jpg = image_to_jpeg_bytes(img)
+    elif isinstance(img, bytes):
+        bytes_jpg = img
+    else:
+        return
+    update.message.reply_photo(photo=BytesIO(bytes_jpg))
+
+
+def image_to_jpeg_bytes(img):
+    with BytesIO() as bio:
+        bio.name = 'image.jpeg'
+        Image.fromarray(img).save(bio, 'JPEG')
+        bio.seek(0)
+        return bio.read()
 
 
 def check_pic(bot, update):
@@ -55,6 +67,8 @@ def check_pic(bot, update):
     frame = cv2.imread(filename)
     dbg = {}
     update.message.reply_text(solve_frame(frame, dbg), parse_mode=telegram.ParseMode.MARKDOWN)
+    if 'answer_pic' in dbg:
+        reply_photo_by_array(update, dbg['answer_pic'])
 
     with open(filename_pkl, 'wb') as f:
         pickle.dump(dbg, f)
@@ -68,12 +82,16 @@ def solve_frame(frame, dbg):
     solved = False
     if (rows == cols) and (rows > 2):
         letters_to_recognize = extract_letters_to_recognize(frame_bw, rows)
-        dbg['letters_pic'] = letters_to_recognize_to_pic(letters_to_recognize)
+        dbg['letters_pic'] = image_to_jpeg_bytes(letters_to_recognize_to_pic(letters_to_recognize))
         board = build_board(letters_to_recognize)
         dbg['board'] = board
         board_printable = ('\n'.join([''.join(c + ' ' for c in l) for l in board]))
+        answer_res, decomposition = solve_txt(build_board(letters_to_recognize))
         answer = f'Вот какое поле для игры, я увидел своим компютерным зрением:\n' \
-                 f'`{board_printable}`\n\n{solve_txt(board)}'
+                 f'`{board_printable}`\n\n{answer_res}'
+        dbg['answer_pic'] = image_to_jpeg_bytes(
+            make_answer_frame(cv2.resize(frame_bw, (512, 512)), decomposition, rows))
+        dbg['answer_ar'] = image_to_jpeg_bytes(make_ar_frame(frame, decomposition, rows, dbg['corners']))
         solved = True
     else:
         answer = f'Видимо, ' \
