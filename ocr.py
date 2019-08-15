@@ -17,6 +17,10 @@ def init_ocr():
     global patterns
     with gzip.open(ocr_data, 'r') as f:
         patterns = pickle.load(f, encoding='latin1')
+        # Dirty temporary hack.  The "Ю" char was learn in too hi resolution and
+        # it can lead to the problems in detection of lower resolution "Ю" versions
+        #
+        patterns['ю'] = (cv2.resize(patterns['ю'], (80, 75)) > 128).astype('uint8') * 255
 
 
 def is_img_the_same(i1, i2):
