@@ -93,9 +93,12 @@ def list_possible_decompositions(words_with_masks, rows_count, print_fun=print):
             print('Есть ещё %d разных вариантов, из ранее названных слов' % other_cnt)
         # print('rec calls: %d' % cnt[0])
     else:
-        print('Не могу найти полных решений, но вот несколькл слов, которые могли быть тут загаданы:')
-        # noinspection PyTypeChecker
-        print('  ', ', '.join(sorted(set(next(zip(*words_with_masks))), key=len, reverse=True)[:15]))
+        if words_with_masks:
+            print('Не могу найти полных решений, но вот несколькл слов, которые могли быть тут загаданы:')
+            # noinspection PyTypeChecker
+            print('  ', ', '.join(sorted(set(next(zip(*words_with_masks))), key=len, reverse=True)[:15]))
+        else:
+            print('Совсем не вижу знакомых слов.')
     return result
 
 
